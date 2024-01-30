@@ -1,31 +1,28 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const mysql = require('mysql');
+const { MongoClient } = require('mongodb');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Create MySQL connection
-const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'chatapp',
-});
+// MongoDB connection string
+const mongoUri = 'mongodb+srv://<Siddharth>:<pwqv3biao1F264Gv>@cluster0.hn2aoni.mongodb.net/?retryWrites=true&w=majority'; // Replace with your MongoDB connection string
 
-db.connect((err) => {
-  if (err) {
-    throw err;
-  }
-  console.log('MySQL Connected');
-});
+let db;
 
-// Create a table for storing users
-
-
+// Connect to MongoDB
+MongoClient.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then((client) => {
+    db = client.db('admin'); // Replace 'chatapp' with your database name
+    console.log('MongoDB Connected');
+  })
+  .catch((err) => {
+    console.error('Error connecting to MongoDB:', err);
+    process.exit(1);
+  });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -40,15 +37,15 @@ io.on('connection', (socket) => {
   });
 
   socket.on('message', (message) => {
-    // Save the message to the database
+    // Save the message to MongoDB
     const sender = activeUsers[socket.id];
-    db.query('INSERT INTO messages (sender, message) VALUES (?, ?)', [sender, message], (err, result) => {
-      if (err) {
-        console.error('Error saving message to the database:', err);
-      } else {
-        console.log('Message saved to the database');
-      }
-    });
+    db.collection('messages').insertOne({ sender, message })
+      .then(() => {
+        console.log('Message saved to MongoDB');
+      })
+      .catch((err) => {
+        console.error('Error saving message to MongoDB:', err);
+      });
 
     io.emit('message', { user: sender, message });
   });
@@ -56,39 +53,35 @@ io.on('connection', (socket) => {
   // Handle user registration
   socket.on('register', (registrationData) => {
     const { username, passkey } = registrationData;
-    db.query('INSERT INTO users (username, passkey) VALUES (?, ?)', [username, passkey], (err, result) => {
-      if (err) {
+    db.collection('users').insertOne({ username, passkey })
+      .then(() => {
+        console.log('User registered successfully');
+        socket.emit('registerResponse', { success: true, message: 'User registered successfully. You can now log in.', username });
+      })
+      .catch((err) => {
         console.error('Error registering user:', err);
         socket.emit('registerResponse', { success: false, message: 'Registration failed. Please try again.' });
-      } else {
-        console.log('User registered successfully', result);
-        socket.emit('registerResponse', { success: true, message: 'User registered successfully. You can now log in.', username });
-      }
-    });
+      });
   });
-  
-
 
   // Handle user login
-  // Handle user login
-socket.on('login', (loginData) => {
-  const { username, passkey } = loginData;
-  db.query('SELECT * FROM users WHERE username = ? AND passkey = ?', [username, passkey], (err, results) => {
-    if (err) {
-      console.error('Error checking login credentials:', err);
-      socket.emit('loginResponse', { success: false, message: 'Login failed. Please try again.' });
-    } else {
-      if (results.length > 0) {
-        console.log('User logged in successfully');
-        socket.emit('loginResponse', { success: true, message: 'Login successful.', username });
-      } else {
-        console.log('Invalid login credentials');
-        socket.emit('loginResponse', { success: false, message: 'Invalid login credentials. Please try again.' });
-      }
-    }
+  socket.on('login', (loginData) => {
+    const { username, passkey } = loginData;
+    db.collection('users').findOne({ username, passkey })
+      .then((user) => {
+        if (user) {
+          console.log('User logged in successfully');
+          socket.emit('loginResponse', { success: true, message: 'Login successful.', username });
+        } else {
+          console.log('Invalid login credentials');
+          socket.emit('loginResponse', { success: false, message: 'Invalid login credentials. Please try again.' });
+        }
+      })
+      .catch((err) => {
+        console.error('Error checking login credentials:', err);
+        socket.emit('loginResponse', { success: false, message: 'Login failed. Please try again.' });
+      });
   });
-});
-
 
   socket.on('disconnect', () => {
     delete activeUsers[socket.id];
@@ -98,7 +91,6 @@ socket.on('login', (loginData) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const HOST = '192.168.29.104';
-server.listen(PORT, HOST, () => {
-  console.log(`Server is running on ==>  http://${HOST}:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
