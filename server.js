@@ -16,7 +16,7 @@ let db;
 // Connect to MongoDB
 MongoClient.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then((client) => {
-    db = client.db('admin'); // Replace 'chatapp' with your database name
+    db = client.db('chatapp'); // Replace 'chatapp' with your database name
     console.log('MongoDB Connected');
   })
   .catch((err) => {
