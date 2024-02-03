@@ -9,7 +9,7 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 // MongoDB connection string
-const mongoUri = 'mongodb+srv://<Siddharth>:<Jagwan@123>@cluster0.hn2aoni.mongodb.net/?retryWrites=true&w=majority'; // Replace with your MongoDB connection string
+const mongoUri = 'mongodb+srv://Siddharth:Jagwan5932@cluster0.hn2aoni.mongodb.net/?retryWrites=true&w=majority'; // Replace with your MongoDB connection string
 
 let db;
 
